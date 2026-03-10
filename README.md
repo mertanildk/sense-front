@@ -1,97 +1,157 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+# LiveApp — React Native Frontend
 
-# Getting Started
+Canlı yayın platformu mobil uygulaması. iOS ve Android için React Native CLI + TypeScript.
 
-> **Note**: Make sure you have completed the [Set Up Your Environment](https://reactnative.dev/docs/set-up-your-environment) guide before proceeding.
+---
 
-## Step 1: Start Metro
+## 📁 Proje Yapısı
 
-First, you will need to run **Metro**, the JavaScript build tool for React Native.
-
-To start the Metro dev server, run the following command from the root of your React Native project:
-
-```sh
-# Using npm
-npm start
-
-# OR using Yarn
-yarn start
+```
+src/
+├── screens/
+│   ├── Auth/
+│   │   ├── LoginScreen.tsx          ✅ Tamamlandı
+│   │   ├── RegisterScreen.tsx       ✅ Tamamlandı
+│   │   └── ForgotPasswordScreen.tsx ✅ Tamamlandı
+│   ├── Discover/
+│   │   └── DiscoverScreen.tsx       ✅ Tamamlandı
+│   ├── Stream/
+│   │   ├── StreamViewScreen.tsx     ✅ Tamamlandı (3dk timer, yorumlar, hediyeler)
+│   │   └── StreamBroadcastScreen.tsx ✅ Tamamlandı
+│   ├── Room/
+│   │   ├── RoomListScreen.tsx       ✅ Tamamlandı
+│   │   ├── RoomCreateScreen.tsx     ✅ Tamamlandı
+│   │   └── RoomViewScreen.tsx       ✅ Tamamlandı
+│   └── Profile/
+│       ├── ProfileScreen.tsx        ✅ Tamamlandı
+│       ├── EditProfileScreen.tsx    ✅ Tamamlandı
+│       ├── CoinShopScreen.tsx       ✅ Tamamlandı
+│       └── PaymentHistoryScreen.tsx ✅ Tamamlandı
+├── navigation/
+│   └── index.tsx                    ✅ Tüm stack ve tab navigasyonu
+├── store/
+│   ├── authStore.ts                 ✅ Zustand auth store
+│   └── streamStore.ts               ✅ Zustand stream store
+├── services/
+│   ├── api.ts                       ✅ Axios + token refresh interceptor
+│   ├── authService.ts               ✅ Kimlik doğrulama API
+│   ├── streamService.ts             ✅ Yayın API
+│   └── socketService.ts             ✅ Socket.io gerçek zamanlı
+├── theme/
+│   └── index.ts                     ✅ Renkler, tipografi, spacing
+├── types/
+│   └── index.ts                     ✅ Tüm TypeScript tipleri
+└── constants/
+    └── index.ts                     ✅ API URL, sabitler
 ```
 
-## Step 2: Build and run your app
+---
 
-With Metro running, open a new terminal window/pane from the root of your React Native project, and use one of the following commands to build and run your Android or iOS app:
+## 🚀 Kurulum
 
-### Android
+### 1. Proje oluştur
 
-```sh
-# Using npm
-npm run android
-
-# OR using Yarn
-yarn android
+```bash
+npx react-native init LiveApp --template react-native-template-typescript
+cd LiveApp
 ```
 
-### iOS
+### 2. Bu dosyaları kopyala
 
-For iOS, remember to install CocoaPods dependencies (this only needs to be run on first clone or after updating native deps).
+Repo'daki `src/`, `App.tsx`, `babel.config.js` dosyalarını projenin kök dizinine kopyala.
 
-The first time you create a new project, run the Ruby bundler to install CocoaPods itself:
+### 3. Bağımlılıkları yükle
 
-```sh
-bundle install
+```bash
+npm install
+
+# iOS için
+cd ios && pod install && cd ..
 ```
 
-Then, and every time you update your native dependencies, run:
+### 4. Eksik package kur
 
-```sh
-bundle exec pod install
+```bash
+npm install babel-plugin-module-resolver --save-dev
 ```
 
-For more information, please visit [CocoaPods Getting Started guide](https://guides.cocoapods.org/using/getting-started.html).
+### 5. Android için `android/app/src/main/AndroidManifest.xml` izinleri
 
-```sh
-# Using npm
-npm run ios
-
-# OR using Yarn
-yarn ios
+```xml
+<uses-permission android:name="android.permission.INTERNET" />
+<uses-permission android:name="android.permission.CAMERA" />
+<uses-permission android:name="android.permission.RECORD_AUDIO" />
 ```
 
-If everything is set up correctly, you should see your new app running in the Android Emulator, iOS Simulator, or your connected device.
+---
 
-This is one way to run your app — you can also build it directly from Android Studio or Xcode.
+## ⚙️ Konfigürasyon
 
-## Step 3: Modify your app
+`src/constants/index.ts` dosyasını düzenle:
 
-Now that you have successfully run the app, let's make changes!
+```ts
+export const API_BASE_URL = 'https://api.yourdomain.com/api/v1';
+export const WS_BASE_URL = 'wss://api.yourdomain.com';
+```
 
-Open `App.tsx` in your text editor of choice and make some changes. When you save, your app will automatically update and reflect these changes — this is powered by [Fast Refresh](https://reactnative.dev/docs/fast-refresh).
+---
 
-When you want to forcefully reload, for example to reset the state of your app, you can perform a full reload:
+## 🎥 Agora Entegrasyonu (Canlı Yayın)
 
-- **Android**: Press the <kbd>R</kbd> key twice or select **"Reload"** from the **Dev Menu**, accessed via <kbd>Ctrl</kbd> + <kbd>M</kbd> (Windows/Linux) or <kbd>Cmd ⌘</kbd> + <kbd>M</kbd> (macOS).
-- **iOS**: Press <kbd>R</kbd> in iOS Simulator.
+1. [Agora.io](https://agora.io) hesabı aç, App ID al
 
-## Congratulations! :tada:
+2. Package kur:
+```bash
+npm install react-native-agora
+cd ios && pod install
+```
 
-You've successfully run and modified your React Native App. :partying_face:
+3. `StreamViewScreen.tsx` içindeki `videoArea`'ya Agora RtcEngine'i entegre et:
+```tsx
+import RtcEngine, { RtcLocalView, RtcRemoteView } from 'react-native-agora';
 
-### Now what?
+// Backend'den alınan agoraToken ile:
+await engine.joinChannel(agoraToken, agoraChannel, null, uid);
+```
 
-- If you want to add this new React Native code to an existing application, check out the [Integration guide](https://reactnative.dev/docs/integration-with-existing-apps).
-- If you're curious to learn more about React Native, check out the [docs](https://reactnative.dev/docs/getting-started).
+4. Backend `POST /streams/{id}/join` endpoint'i Agora token döndürmeli.
 
-# Troubleshooting
+---
 
-If you're having issues getting the above steps to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
+## 💳 İyzico Entegrasyonu
 
-# Learn More
+1. [İyzico](https://iyzico.com) sandbox hesabı aç
 
-To learn more about React Native, take a look at the following resources:
+2. `CoinShopScreen.tsx` içindeki `handlePurchase` fonksiyonuna:
+```ts
+// 1. Backend'e istek at, İyzico checkoutForm URL al
+const { data } = await api.post('/payments/initiate', { packageId: pkg.id });
 
-- [React Native Website](https://reactnative.dev) - learn more about React Native.
-- [Getting Started](https://reactnative.dev/docs/environment-setup) - an **overview** of React Native and how setup your environment.
-- [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
-- [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
-- [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.
+// 2. WebView ile ödeme sayfasını aç
+// react-native-webview kullan
+navigation.navigate('PaymentWebView', { url: data.checkoutFormUrl });
+```
+
+---
+
+## 🧪 Çalıştır
+
+```bash
+# Android
+npx react-native run-android
+
+# iOS
+npx react-native run-ios
+```
+
+---
+
+## 🗺️ Sıradaki Adımlar
+
+- [ ] Agora SDK entegrasyonu
+- [ ] İyzico WebView ödeme sayfası
+- [ ] Push notification (Firebase)
+- [ ] Deep link (özel oda davet linki)
+- [ ] Lazy loading + infinite scroll (Keşfet)
+- [ ] Animasyonlar (Reanimated)
+- [ ] Hediye animasyonu (lottie)
