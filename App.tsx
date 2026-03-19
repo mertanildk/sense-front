@@ -2,15 +2,19 @@ import React, { useEffect } from 'react';
 import { StatusBar } from 'react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { registerGlobals } from '@livekit/react-native';
 import { useAuthStore } from '@store/authStore';
 import RootNavigator from '@navigation/index';
 import { palette } from '@theme/index';
+
+// LiveKit WebRTC global'lerini kaydet — en üstte çağrılmalı
+registerGlobals();
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       retry: 2,
-      staleTime: 1000 * 60 * 2, // 2 dakika
+      staleTime: 1000 * 60 * 2,
     },
   },
 });

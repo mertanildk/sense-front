@@ -1,114 +1,110 @@
-// ─── User ────────────────────────────────────────────────────────────────────
+// ─── User ─────────────────────────────────────────────────────────────────────
+export type UserRole = 'USER' | 'MODERATOR';
+export type UserStatus = 'ACTIVE' | 'BANNED' | 'SUSPENDED';
+
 export interface User {
-  id: string;
+  id: number;
   username: string;
-  email: string;
-  avatar?: string;
-  coinBalance: number;
-  followerCount: number;
-  followingCount: number;
-  isFollowing?: boolean;
-  createdAt: string;
-}
-
-// ─── Stream ───────────────────────────────────────────────────────────────────
-export type StreamStatus = 'live' | 'ended' | 'scheduled';
-
-export interface Stream {
-  id: string;
-  hostUserId: string;
-  host: User;
-  title: string;
-  thumbnailUrl?: string;
-  status: StreamStatus;
-  viewerCount: number;
-  category?: string;
-  startedAt: string;
-  agoraChannel?: string;
-}
-
-// ─── Comment ──────────────────────────────────────────────────────────────────
-export interface Comment {
-  id: string;
-  streamId: string;
-  user: Pick<User, 'id' | 'username' | 'avatar'>;
-  content: string;
-  createdAt: string;
-}
-
-// ─── Gift / Coin ──────────────────────────────────────────────────────────────
-export interface Gift {
-  id: string;
-  streamId: string;
-  sender: Pick<User, 'id' | 'username' | 'avatar'>;
-  coinAmount: number;
-  createdAt: string;
-}
-
-export interface CoinPackage {
-  id: string;
-  name: string;
-  coinAmount: number;
-  priceTry: number;
-  isPopular?: boolean;
-}
-
-export interface PaymentHistory {
-  id: string;
-  packageName: string;
-  coinAmount: number;
-  priceTry: number;
-  status: 'success' | 'failed' | 'pending';
+  email?: string;
+  role: UserRole;
+  creditBalance: number;
+  status: UserStatus;
   createdAt: string;
 }
 
 // ─── Room ─────────────────────────────────────────────────────────────────────
-export interface PrivateRoom {
-  id: string;
-  host: User;
+export type RoomStatus = 'SCHEDULED' | 'LIVE' | 'ENDED';
+
+export interface Room {
+  id: number;
+  hostId: number;
+  hostUsername: string;
   title: string;
-  inviteCode: string;
-  memberCount: number;
-  maxMembers: number;
-  isLocked: boolean;
-  createdAt: string;
+  status: RoomStatus;
+  videoRoomId: string;
+  viewerCount: number;
+  startedAt?: string;
+  endedAt?: string;
+}
+
+export interface JoinRoomResponse {
+  roomId: number;
+  videoRoomId: string;
+  videoToken: string;
+}
+
+export interface CreateRoomRequest {
+  title: string;
+}
+
+// ─── Gift ─────────────────────────────────────────────────────────────────────
+export interface SendGiftRequest {
+  creditAmount: number;
+  giftType: string;
 }
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
-export interface AuthTokens {
-  accessToken: string;
-  refreshToken: string;
-}
-
 export interface LoginRequest {
-  email: string;
+  username: string;
   password: string;
 }
 
 export interface RegisterRequest {
   username: string;
-  email: string;
+  email?: string;
   password: string;
 }
 
-// ─── API ──────────────────────────────────────────────────────────────────────
-export interface ApiResponse<T> {
-  data: T;
-  message?: string;
-  success: boolean;
+export interface LoginResponse {
+  token: string;
+  username: string;
+  role: UserRole;
 }
 
-export interface PaginatedResponse<T> {
-  data: T[];
+// ─── Payment / Credit ─────────────────────────────────────────────────────────
+export type TransactionType = 'PURCHASE' | 'GIFT' | 'WITHDRAWAL' | 'REFUND';
+
+export interface CreditTransaction {
+  id: number;
+  fromUser?: User;
+  toUser?: User;
+  amount: number;
+  type: TransactionType;
+  referenceId?: string;
+  createdAt: string;
+}
+
+export interface CreatePaymentIntentRequest {
+  amountCents: number;
+  currency: string;
+  creditAmount: number;
+}
+
+export interface CreatePaymentIntentResponse {
+  clientSecret: string;
+  paymentIntentId: string;
+}
+
+// ─── Pagination ───────────────────────────────────────────────────────────────
+export interface PageResponse<T> {
+  content: T[];
+  totalPages: number;
+  totalElements: number;
+  size: number;
+  number: number;
+  first: boolean;
+  last: boolean;
+  empty: boolean;
+}
+
+export interface PageableParams {
   page: number;
-  limit: number;
-  total: number;
-  hasMore: boolean;
+  size: number;
+  sort?: string[];
 }
 
 // ─── Navigation ───────────────────────────────────────────────────────────────
 export type RootStackParamList = {
-  Splash: undefined;
   Auth: undefined;
   Main: undefined;
 };
@@ -116,7 +112,6 @@ export type RootStackParamList = {
 export type AuthStackParamList = {
   Login: undefined;
   Register: undefined;
-  ForgotPassword: undefined;
 };
 
 export type MainTabParamList = {
@@ -127,14 +122,14 @@ export type MainTabParamList = {
 
 export type DiscoverStackParamList = {
   DiscoverHome: undefined;
-  StreamView: { streamId: string; agoraChannel: string };
-  UserProfile: { userId: string };
+  RoomView: { roomId: number };
+  StreamBroadcast: undefined;
 };
 
 export type RoomStackParamList = {
   RoomList: undefined;
   RoomCreate: undefined;
-  RoomView: { roomId: string; inviteCode?: string };
+  RoomView: { roomId: number };
 };
 
 export type ProfileStackParamList = {
@@ -142,6 +137,5 @@ export type ProfileStackParamList = {
   EditProfile: undefined;
   CoinShop: undefined;
   PaymentHistory: undefined;
-  StreamBroadcast: undefined;
   Settings: undefined;
 };

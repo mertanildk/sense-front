@@ -2,26 +2,32 @@ import React from 'react';
 import { View, Text, FlatList, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useQuery } from '@tanstack/react-query';
-import api from '@services/api';
+import { userService } from '@services/userService';
 import { palette, typography, spacing, radius } from '@theme/index';
-import type { PaymentHistory, ApiResponse, PaginatedResponse } from '@appTypes/index';
-import { format } from 'date-fns';
-import { tr } from 'date-fns/locale';
+import type { CreditTransaction } from '@appTypes/index';
+
+const TYPE_LABEL: Record<string, string> = {
+  PURCHASE: '💳 Satın Alma',
+  GIFT: '🎁 Hediye',
+  WITHDRAWAL: '💸 Çekim',
+  REFUND: '↩️ İade',
+};
+
+const TYPE_COLOR: Record<string, string> = {
+  PURCHASE: palette.success,
+  GIFT: palette.accent,
+  WITHDRAWAL: palette.error,
+  REFUND: palette.info,
+};
 
 export default function PaymentHistoryScreen() {
   const navigation = useNavigation();
   const { data, isLoading } = useQuery({
-    queryKey: ['payment-history'],
-    queryFn: async () => {
-      const r = await api.get<ApiResponse<PaginatedResponse<PaymentHistory>>>('/payments/history');
-      return r.data.data.data;
-    },
+    queryKey: ['transactions'],
+    queryFn: () => userService.getTransactions({ page: 0, size: 50 }),
   });
 
-  const statusColor = (s: string) =>
-    s === 'success' ? palette.success : s === 'failed' ? palette.error : palette.warning;
-  const statusLabel = (s: string) =>
-    s === 'success' ? '✅ Başarılı' : s === 'failed' ? '❌ Başarısız' : '⏳ Beklemede';
+  const transactions = data?.content ?? [];
 
   return (
     <View style={styles.container}>
@@ -29,28 +35,33 @@ export default function PaymentHistoryScreen() {
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <Text style={styles.backText}>←</Text>
         </TouchableOpacity>
-        <Text style={styles.title}>Ödeme Geçmişi</Text>
+        <Text style={styles.title}>Kredi Geçmişi</Text>
         <View style={{ width: 36 }} />
       </View>
+
       {isLoading ? (
         <View style={styles.center}><ActivityIndicator color={palette.primary} /></View>
       ) : (
         <FlatList
-          data={data ?? []}
-          keyExtractor={item => item.id}
+          data={transactions}
+          keyExtractor={item => String(item.id)}
           contentContainerStyle={styles.list}
-          ListEmptyComponent={<View style={styles.center}><Text style={styles.emptyText}>Henüz ödeme geçmişi yok</Text></View>}
-          renderItem={({ item }) => (
+          ListEmptyComponent={
+            <View style={styles.center}>
+              <Text style={{ fontSize: 48 }}>📭</Text>
+              <Text style={styles.emptyText}>Henüz işlem yok</Text>
+            </View>
+          }
+          renderItem={({ item }: { item: CreditTransaction }) => (
             <View style={styles.item}>
               <View style={styles.itemLeft}>
-                <Text style={styles.packageName}>{item.packageName}</Text>
-                <Text style={styles.itemDate}>{format(new Date(item.createdAt), 'dd MMM yyyy HH:mm', { locale: tr })}</Text>
+                <Text style={styles.itemType}>{TYPE_LABEL[item.type] ?? item.type}</Text>
+                <Text style={styles.itemDate}>{new Date(item.createdAt).toLocaleDateString('tr-TR')}</Text>
+                {item.referenceId ? <Text style={styles.itemRef}>Ref: {item.referenceId}</Text> : null}
               </View>
-              <View style={styles.itemRight}>
-                <Text style={styles.itemCoins}>🪙 +{item.coinAmount}</Text>
-                <Text style={[styles.itemPrice, { color: statusColor(item.status) }]}>{statusLabel(item.status)}</Text>
-                <Text style={styles.itemPriceTry}>₺{item.priceTry}</Text>
-              </View>
+              <Text style={[styles.itemAmount, { color: TYPE_COLOR[item.type] ?? palette.white }]}>
+                {item.type === 'PURCHASE' || item.type === 'REFUND' ? '+' : '-'}{item.amount} 💎
+              </Text>
             </View>
           )}
         />
@@ -64,15 +75,13 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.xl, paddingTop: 54, paddingBottom: spacing.md },
   backText: { color: palette.white, fontSize: typography.xl },
   title: { fontSize: typography.md, fontWeight: '700', color: palette.white },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.md, paddingTop: 60 },
   emptyText: { color: palette.grey2 },
   list: { padding: spacing.xl, gap: spacing.sm },
   item: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: palette.dark2, borderRadius: radius.lg, padding: spacing.base },
-  itemLeft: { gap: 4 },
-  packageName: { color: palette.white, fontWeight: '700', fontSize: typography.base },
+  itemLeft: { gap: 3 },
+  itemType: { color: palette.white, fontWeight: '700', fontSize: typography.base },
   itemDate: { color: palette.grey2, fontSize: typography.xs },
-  itemRight: { alignItems: 'flex-end', gap: 4 },
-  itemCoins: { color: palette.accent, fontWeight: '700', fontSize: typography.base },
-  itemPrice: { fontSize: typography.xs, fontWeight: '600' },
-  itemPriceTry: { color: palette.grey3, fontSize: typography.sm },
+  itemRef: { color: palette.grey1, fontSize: typography.xs },
+  itemAmount: { fontSize: typography.md, fontWeight: '800' },
 });

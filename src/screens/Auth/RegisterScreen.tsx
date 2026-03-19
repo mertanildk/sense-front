@@ -26,12 +26,11 @@ export default function RegisterScreen() {
 
   const validate = (): boolean => {
     const errors: Record<string, string> = {};
-    if (!form.username.trim()) errors.username = 'Kullanıcı adı gerekli';
+    if (!form.username.trim())        errors.username = 'Kullanıcı adı gerekli';
     else if (form.username.length < 3) errors.username = 'En az 3 karakter';
+    else if (form.username.length > 50) errors.username = 'En fazla 50 karakter';
     else if (!/^[a-zA-Z0-9_]+$/.test(form.username)) errors.username = 'Sadece harf, rakam ve _';
-    if (!form.email.trim()) errors.email = 'E-posta gerekli';
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) errors.email = 'Geçerli e-posta girin';
-    if (!form.password) errors.password = 'Şifre gerekli';
+    if (!form.password)                errors.password = 'Şifre gerekli';
     else if (form.password.length < 8) errors.password = 'En az 8 karakter';
     if (form.password !== form.confirm) errors.confirm = 'Şifreler eşleşmiyor';
     setFieldErrors(errors);
@@ -42,21 +41,18 @@ export default function RegisterScreen() {
     clearError();
     if (!validate()) return;
     try {
-      await register({ username: form.username, email: form.email.toLowerCase(), password: form.password });
-    } catch { /* handled in store */ }
+      await register({
+        username: form.username.trim(),
+        email: form.email.trim() || undefined,
+        password: form.password,
+      });
+    } catch { /* handled */ }
   };
-
-  const fields: Array<{ key: keyof typeof form; label: string; placeholder: string; secure?: boolean; keyboard?: 'default' | 'email-address' }> = [
-    { key: 'username', label: 'Kullanıcı Adı', placeholder: 'kullanici_adi' },
-    { key: 'email', label: 'E-posta', placeholder: 'ornek@email.com', keyboard: 'email-address' },
-    { key: 'password', label: 'Şifre', placeholder: '••••••••', secure: true },
-    { key: 'confirm', label: 'Şifre Tekrar', placeholder: '••••••••', secure: true },
-  ];
 
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-        {/* Back */}
+
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
           <Text style={styles.backText}>← Geri</Text>
         </TouchableOpacity>
@@ -64,51 +60,57 @@ export default function RegisterScreen() {
         <Text style={styles.title}>Hesap Oluştur</Text>
         <Text style={styles.subtitle}>Saniyeler içinde yayına başla</Text>
 
-        {error && (
+        {error ? (
           <View style={styles.errorBanner}>
             <Text style={styles.errorText}>{error}</Text>
           </View>
-        )}
+        ) : null}
 
         <View style={styles.form}>
-          {fields.map(field => (
-            <View key={field.key} style={styles.fieldGroup}>
-              <Text style={styles.label}>{field.label}</Text>
-              <View style={[styles.inputWrapper, fieldErrors[field.key] ? styles.inputError : null]}>
-                <TextInput
-                  style={[styles.input, { flex: 1 }]}
-                  placeholder={field.placeholder}
-                  placeholderTextColor={palette.grey1}
-                  value={form[field.key]}
-                  onChangeText={v => setField(field.key, v)}
-                  secureTextEntry={field.secure && !showPass}
-                  keyboardType={field.keyboard ?? 'default'}
-                  autoCapitalize={field.keyboard === 'email-address' ? 'none' : field.key === 'username' ? 'none' : 'sentences'}
-                  autoCorrect={false}
-                />
-                {field.key === 'password' && (
-                  <TouchableOpacity onPress={() => setShowPass(p => !p)} style={styles.eyeBtn}>
-                    <Text>{showPass ? '🙈' : '👁️'}</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-              {fieldErrors[field.key] && <Text style={styles.fieldError}>{fieldErrors[field.key]}</Text>}
+          {/* Username */}
+          <View style={styles.fieldGroup}>
+            <Text style={styles.label}>Kullanıcı Adı <Text style={styles.required}>*</Text></Text>
+            <View style={[styles.inputWrapper, fieldErrors.username ? styles.inputError : null]}>
+              <TextInput style={styles.input} placeholder="kullanici_adi" placeholderTextColor={palette.grey1} value={form.username} onChangeText={v => setField('username', v)} autoCapitalize="none" autoCorrect={false} />
             </View>
-          ))}
+            {fieldErrors.username ? <Text style={styles.fieldError}>{fieldErrors.username}</Text> : null}
+          </View>
 
-          <TouchableOpacity
-            style={[styles.registerBtn, isLoading && styles.btnDisabled]}
-            onPress={handleRegister}
-            disabled={isLoading}
-            activeOpacity={0.85}
-          >
+          {/* Email (opsiyonel) */}
+          <View style={styles.fieldGroup}>
+            <Text style={styles.label}>E-posta <Text style={styles.optional}>(opsiyonel)</Text></Text>
+            <View style={styles.inputWrapper}>
+              <TextInput style={styles.input} placeholder="ornek@email.com" placeholderTextColor={palette.grey1} value={form.email} onChangeText={v => setField('email', v)} keyboardType="email-address" autoCapitalize="none" />
+            </View>
+          </View>
+
+          {/* Password */}
+          <View style={styles.fieldGroup}>
+            <Text style={styles.label}>Şifre <Text style={styles.required}>*</Text></Text>
+            <View style={[styles.inputWrapper, fieldErrors.password ? styles.inputError : null]}>
+              <TextInput style={[styles.input, { flex: 1 }]} placeholder="En az 8 karakter" placeholderTextColor={palette.grey1} value={form.password} onChangeText={v => setField('password', v)} secureTextEntry={!showPass} />
+              <TouchableOpacity onPress={() => setShowPass(p => !p)} style={styles.eyeBtn}>
+                <Text>{showPass ? '🙈' : '👁️'}</Text>
+              </TouchableOpacity>
+            </View>
+            {fieldErrors.password ? <Text style={styles.fieldError}>{fieldErrors.password}</Text> : null}
+          </View>
+
+          {/* Confirm */}
+          <View style={styles.fieldGroup}>
+            <Text style={styles.label}>Şifre Tekrar <Text style={styles.required}>*</Text></Text>
+            <View style={[styles.inputWrapper, fieldErrors.confirm ? styles.inputError : null]}>
+              <TextInput style={styles.input} placeholder="••••••••" placeholderTextColor={palette.grey1} value={form.confirm} onChangeText={v => setField('confirm', v)} secureTextEntry={!showPass} />
+            </View>
+            {fieldErrors.confirm ? <Text style={styles.fieldError}>{fieldErrors.confirm}</Text> : null}
+          </View>
+
+          <TouchableOpacity style={[styles.registerBtn, isLoading && styles.btnDisabled]} onPress={handleRegister} disabled={isLoading} activeOpacity={0.85}>
             {isLoading ? <ActivityIndicator color={palette.white} /> : <Text style={styles.registerBtnText}>Kayıt Ol</Text>}
           </TouchableOpacity>
 
           <TouchableOpacity onPress={() => navigation.navigate('Login')} style={styles.loginLink}>
-            <Text style={styles.loginLinkText}>
-              Zaten hesabın var mı? <Text style={styles.loginLinkBold}>Giriş Yap</Text>
-            </Text>
+            <Text style={styles.loginLinkText}>Zaten hesabın var mı? <Text style={styles.loginLinkBold}>Giriş Yap</Text></Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -128,9 +130,11 @@ const styles = StyleSheet.create({
   form: { gap: spacing.base },
   fieldGroup: { gap: spacing.xs },
   label: { fontSize: typography.sm, fontWeight: '600', color: palette.grey3 },
+  required: { color: palette.error },
+  optional: { color: palette.grey1, fontWeight: '400' },
   inputWrapper: { flexDirection: 'row', alignItems: 'center', backgroundColor: palette.dark3, borderRadius: radius.md, borderWidth: 1, borderColor: palette.dark4, paddingHorizontal: spacing.base, height: 52 },
   inputError: { borderColor: palette.error },
-  input: { color: palette.white, fontSize: typography.base },
+  input: { flex: 1, color: palette.white, fontSize: typography.base },
   eyeBtn: { padding: spacing.xs },
   fieldError: { fontSize: typography.xs, color: palette.error },
   registerBtn: { height: 54, backgroundColor: palette.primary, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', marginTop: spacing.sm, shadowColor: palette.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 12, elevation: 8 },

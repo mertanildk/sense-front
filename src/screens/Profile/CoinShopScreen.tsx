@@ -1,48 +1,44 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, ActivityIndicator } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { useQuery } from '@tanstack/react-query';
-import api from '@services/api';
 import { useAuthStore } from '@store/authStore';
+import { paymentService, CREDIT_PACKAGES, CreditPackage } from '@services/paymentService';
 import { palette, typography, spacing, radius } from '@theme/index';
-import { DEFAULT_COIN_PACKAGES } from '@constants/index';
-import type { CoinPackage, ApiResponse } from '@appTypes/index';
 
 export default function CoinShopScreen() {
   const navigation = useNavigation();
-  const { user, updateUser } = useAuthStore();
-  const [purchasing, setPurchasing] = useState<string | null>(null);
+  const { user, refreshUser } = useAuthStore();
+  const [purchasing, setPurchasing] = useState<number | null>(null);
 
-  const { data: packages } = useQuery({
-    queryKey: ['coin-packages'],
-    queryFn: async () => {
-      const r = await api.get<ApiResponse<CoinPackage[]>>('/coins/packages');
-      return r.data.data;
-    },
-    placeholderData: DEFAULT_COIN_PACKAGES as CoinPackage[],
-  });
-
-  const handlePurchase = async (pkg: CoinPackage) => {
+  const handlePurchase = async (pkg: CreditPackage) => {
     setPurchasing(pkg.id);
     try {
-      // İyzico entegrasyonu burada yapılacak
-      // Şimdilik mock flow
+      // Stripe PaymentIntent oluştur
+      const intent = await paymentService.createPaymentIntent({
+        amountCents: pkg.amountCents,
+        currency: pkg.currency,
+        creditAmount: pkg.creditAmount,
+      });
+
+      // TODO: Stripe SDK ile ödeme akışını başlat
+      // Şimdilik bilgi göster
       Alert.alert(
-        'Satın Al',
-        `${pkg.coinAmount} jeton için ₺${pkg.priceTry} ödenecek.\n\n(İyzico ödeme ekranı burada açılacak)`,
+        '💳 Ödeme',
+        `${pkg.creditAmount} kredi için ₺${(pkg.amountCents / 100).toFixed(2)} ödenecek.\n\nStripe entegrasyonu tamamlandığında burada ödeme ekranı açılacak.\n\nPaymentIntent: ${intent.paymentIntentId}`,
         [
-          { text: 'İptal', style: 'cancel' },
+          { text: 'Kapat', style: 'cancel' },
           {
-            text: 'Onayla',
+            text: 'Simüle Et (Test)',
             onPress: async () => {
-              // const result = await api.post('/payments/initiate', { packageId: pkg.id });
-              // İyzico checkout URL'e yönlendir
-              updateUser({ coinBalance: (user?.coinBalance ?? 0) + pkg.coinAmount });
-              Alert.alert('✅ Başarılı', `${pkg.coinAmount} jeton hesabına eklendi!`);
+              // Test: webhook ile ödeme tamamlandı simülasyonu
+              await refreshUser();
+              Alert.alert('✅ Başarılı', `${pkg.creditAmount} kredi hesabına eklendi!`);
             },
           },
         ],
       );
+    } catch (e: any) {
+      Alert.alert('Hata', e?.response?.data?.message ?? 'Ödeme başlatılamadı.');
     } finally {
       setPurchasing(null);
     }
@@ -51,30 +47,30 @@ export default function CoinShopScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+        <TouchableOpacity onPress={() => navigation.goBack()}>
           <Text style={styles.backText}>←</Text>
         </TouchableOpacity>
-        <Text style={styles.title}>Jeton Satın Al</Text>
+        <Text style={styles.title}>Kredi Satın Al</Text>
         <View style={{ width: 36 }} />
       </View>
 
-      {/* Balance */}
+      {/* Bakiye */}
       <View style={styles.balanceCard}>
         <Text style={styles.balanceLabel}>Mevcut Bakiye</Text>
-        <Text style={styles.balanceValue}>🪙 {user?.coinBalance ?? 0}</Text>
-        <Text style={styles.balanceSub}>jeton</Text>
+        <Text style={styles.balanceValue}>💎 {user?.creditBalance ?? 0}</Text>
+        <Text style={styles.balanceSub}>kredi</Text>
       </View>
 
       <Text style={styles.sectionTitle}>Paket Seç</Text>
 
       <ScrollView contentContainerStyle={styles.packages} showsVerticalScrollIndicator={false}>
-        {(packages ?? []).map(pkg => (
+        {CREDIT_PACKAGES.map(pkg => (
           <TouchableOpacity
             key={pkg.id}
             style={[styles.packageCard, pkg.isPopular && styles.packageCardPopular]}
             onPress={() => handlePurchase(pkg)}
-            activeOpacity={0.85}
             disabled={purchasing === pkg.id}
+            activeOpacity={0.85}
           >
             {pkg.isPopular && (
               <View style={styles.popularBadge}>
@@ -82,27 +78,26 @@ export default function CoinShopScreen() {
               </View>
             )}
             <View style={styles.packageLeft}>
-              <Text style={styles.packageIcon}>🪙</Text>
+              <Text style={{ fontSize: 32 }}>💎</Text>
               <View>
                 <Text style={styles.packageName}>{pkg.name}</Text>
-                <Text style={styles.packageCoins}>{pkg.coinAmount.toLocaleString('tr-TR')} jeton</Text>
+                <Text style={styles.packageCredits}>{pkg.creditAmount.toLocaleString('tr-TR')} kredi</Text>
               </View>
             </View>
-            <View style={styles.packageRight}>
-              {purchasing === pkg.id ? (
-                <ActivityIndicator color={pkg.isPopular ? palette.dark1 : palette.white} size="small" />
-              ) : (
-                <Text style={[styles.packagePrice, pkg.isPopular && styles.packagePricePopular]}>
-                  ₺{pkg.priceTry}
-                </Text>
-              )}
+            <View>
+              {purchasing === pkg.id
+                ? <ActivityIndicator color={pkg.isPopular ? palette.dark1 : palette.white} size="small" />
+                : <Text style={[styles.packagePrice, pkg.isPopular && { color: palette.dark1 }]}>
+                    ₺{(pkg.amountCents / 100).toFixed(2)}
+                  </Text>
+              }
             </View>
           </TouchableOpacity>
         ))}
 
         <Text style={styles.disclaimer}>
-          Ödemeler İyzico altyapısı üzerinden güvenli şekilde işlenir.{'\n'}
-          Satın alınan jetonlar iade edilemez.
+          Ödemeler Stripe altyapısı ile güvenli şekilde işlenir.{'\n'}
+          Satın alınan krediler iade edilemez.
         </Text>
       </ScrollView>
     </View>
@@ -112,7 +107,6 @@ export default function CoinShopScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: palette.dark1 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.xl, paddingTop: 54, paddingBottom: spacing.md },
-  backBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   backText: { color: palette.white, fontSize: typography.xl },
   title: { fontSize: typography.md, fontWeight: '700', color: palette.white },
   balanceCard: { margin: spacing.xl, backgroundColor: palette.primary, borderRadius: radius.xl, padding: spacing.xl, alignItems: 'center', shadowColor: palette.primary, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.45, shadowRadius: 16, elevation: 10 },
@@ -126,11 +120,8 @@ const styles = StyleSheet.create({
   popularBadge: { position: 'absolute', top: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.25)', paddingHorizontal: spacing.sm, paddingVertical: 3, borderBottomLeftRadius: radius.sm },
   popularText: { fontSize: 9, fontWeight: '800', color: palette.dark1, letterSpacing: 0.5 },
   packageLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  packageIcon: { fontSize: 32 },
   packageName: { fontSize: typography.base, fontWeight: '700', color: palette.white },
-  packageCoins: { fontSize: typography.sm, color: palette.grey3, marginTop: 2 },
-  packageRight: {},
+  packageCredits: { fontSize: typography.sm, color: palette.grey3, marginTop: 2 },
   packagePrice: { fontSize: typography.xl, fontWeight: '800', color: palette.white },
-  packagePricePopular: { color: palette.dark1 },
   disclaimer: { color: palette.grey1, fontSize: typography.xs, textAlign: 'center', lineHeight: 18, marginTop: spacing.md },
 });

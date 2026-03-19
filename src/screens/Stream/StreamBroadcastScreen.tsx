@@ -1,82 +1,135 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  ActivityIndicator, Alert, Platform,
+  ActivityIndicator, Alert,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { streamService } from '@services/streamService';
-import { socketService } from '@services/socketService';
+import {
+  AudioSession,
+  LiveKitRoom,
+  useTracks,
+  VideoTrack,
+  isTrackReference,
+} from '@livekit/react-native';
+import { Track } from 'livekit-client';
+import { roomService } from '@services/roomService';
 import { useStreamStore } from '@store/streamStore';
-import { useAuthStore } from '@store/authStore';
 import { palette, typography, spacing, radius } from '@theme/index';
-import { STREAM_CATEGORIES } from '@constants/index';
 
-type StreamPhase = 'setup' | 'live' | 'ended';
+type Phase = 'setup' | 'live' | 'ended';
+const LIVEKIT_URL = 'wss://wss.capulus.co/';
 
+// ─── Yayıncı Video View — LiveKitRoom içinde çalışır ─────────────────────────
+function BroadcastView({ onEnd, duration, viewerCount }: {
+  onEnd: () => void;
+  duration: number;
+  viewerCount: number;
+}) {
+  // Kendi kamera track'ini al
+  const tracks = useTracks([Track.Source.Camera]);
+  const myTrack = tracks[0];
+
+  const formatDuration = (sec: number) => {
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  };
+
+  return (
+    <View style={styles.liveCameraArea}>
+      {myTrack && isTrackReference(myTrack) ? (
+        <VideoTrack
+          style={StyleSheet.absoluteFill}
+          trackRef={myTrack}
+          objectFit="cover"
+        />
+      ) : (
+        <View style={styles.cameraPreview}>
+          <ActivityIndicator color={palette.primary} size="large" />
+          <Text style={styles.cameraText}>Kamera başlatılıyor...</Text>
+        </View>
+      )}
+
+      <View style={styles.liveTopBar}>
+        <View style={styles.liveBadge}>
+          <View style={styles.liveDot} />
+          <Text style={styles.liveText}>CANLI • {formatDuration(duration)}</Text>
+        </View>
+        <View style={styles.viewerBadge}>
+          <Text style={styles.viewerText}>👁 {viewerCount}</Text>
+        </View>
+      </View>
+
+      <TouchableOpacity style={styles.endBtn} onPress={onEnd}>
+        <Text style={styles.endBtnText}>■ Yayını Bitir</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+// ─── Ana ekran ────────────────────────────────────────────────────────────────
 export default function StreamBroadcastScreen() {
   const navigation = useNavigation();
-  const { user } = useAuthStore();
-  const { viewerCount, setActiveStream, resetStreamState } = useStreamStore();
+  const { viewerCount, resetStreamState } = useStreamStore();
 
-  const [phase, setPhase] = useState<StreamPhase>('setup');
+  const [phase, setPhase] = useState<Phase>('setup');
   const [title, setTitle] = useState('');
-  const [category, setCategory] = useState('chat');
   const [isLoading, setIsLoading] = useState(false);
-  const [activeStreamId, setActiveStreamId] = useState<string | null>(null);
+  const [activeRoomId, setActiveRoomId] = useState<number | null>(null);
+  const [lkToken, setLkToken] = useState<string | null>(null);
   const [duration, setDuration] = useState(0);
 
-  // Yayın süresi sayacı
+  useEffect(() => {
+    // Audio session başlat
+    AudioSession.startAudioSession();
+    return () => { AudioSession.stopAudioSession(); };
+  }, []);
+
   useEffect(() => {
     if (phase !== 'live') return;
     const interval = setInterval(() => setDuration(d => d + 1), 1000);
     return () => clearInterval(interval);
   }, [phase]);
 
-  const formatDuration = (sec: number) => {
-    const h = Math.floor(sec / 3600);
-    const m = Math.floor((sec % 3600) / 60);
-    const s = sec % 60;
-    if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-  };
-
   const handleStartStream = async () => {
     if (!title.trim()) { Alert.alert('Hata', 'Yayın başlığı giriniz'); return; }
     setIsLoading(true);
     try {
-      const { stream } = await streamService.startStream({ title: title.trim(), category });
-      setActiveStreamId(stream.id);
-      setActiveStream(stream);
-      socketService.connect();
-      socketService.joinStream(stream.id);
+      const createdRoom = await roomService.createRoom({ title: title.trim() });
+      setActiveRoomId(createdRoom.id);
+      const joinData = await roomService.joinRoom(createdRoom.id);
+      setLkToken(joinData.videoToken);
       setPhase('live');
-    } catch {
-      Alert.alert('Hata', 'Yayın başlatılamadı. Lütfen tekrar deneyin.');
+    } catch (e: any) {
+      Alert.alert('Hata', e?.response?.data?.message ?? 'Yayın başlatılamadı.');
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleEndStream = () => {
-    Alert.alert('Yayını Bitir', 'Yayını bitirmek istediğinden emin misin?', [
+    Alert.alert('Yayını Bitir', 'Emin misin?', [
       { text: 'İptal', style: 'cancel' },
       {
         text: 'Evet, Bitir', style: 'destructive',
         onPress: async () => {
-          if (!activeStreamId) return;
-          try {
-            await streamService.endStream(activeStreamId);
-            socketService.leaveStream(activeStreamId);
-          } finally {
-            resetStreamState();
-            setPhase('ended');
+          if (activeRoomId) {
+            try { await roomService.endRoom(activeRoomId); } catch {}
           }
+          resetStreamState();
+          setPhase('ended');
         },
       },
     ]);
   };
 
-  // ─── Setup Phase ───────────────────────────────────────────────────────────
+  const formatDuration = (sec: number) => {
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  };
+
+  // ─── Setup ──────────────────────────────────────────────────────────────────
   if (phase === 'setup') {
     return (
       <View style={styles.container}>
@@ -87,42 +140,20 @@ export default function StreamBroadcastScreen() {
           <Text style={styles.headerTitle}>Yayın Başlat</Text>
           <View style={{ width: 36 }} />
         </View>
-
         <View style={styles.cameraPreview}>
           <Text style={styles.cameraIcon}>📹</Text>
-          <Text style={styles.cameraText}>Kamera önizlemesi{'\n'}(Agora SDK entegre edilecek)</Text>
+          <Text style={styles.cameraText}>Yayın başladığında kamera görünecek</Text>
         </View>
-
-        <View style={styles.setupForm}>
-          <View style={styles.fieldGroup}>
-            <Text style={styles.label}>Yayın Başlığı</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Yayının hakkında bir şeyler yaz..."
-              placeholderTextColor={palette.grey1}
-              value={title}
-              onChangeText={setTitle}
-              maxLength={80}
-            />
-          </View>
-
-          <View style={styles.fieldGroup}>
-            <Text style={styles.label}>Kategori</Text>
-            <View style={styles.categories}>
-              {STREAM_CATEGORIES.filter(c => c.id !== 'all').map(cat => (
-                <TouchableOpacity
-                  key={cat.id}
-                  style={[styles.catChip, category === cat.id && styles.catChipActive]}
-                  onPress={() => setCategory(cat.id)}
-                >
-                  <Text style={[styles.catText, category === cat.id && styles.catTextActive]}>
-                    {cat.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-
+        <View style={styles.form}>
+          <Text style={styles.label}>Yayın Başlığı</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Yayının hakkında bir şeyler yaz..."
+            placeholderTextColor={palette.grey1}
+            value={title}
+            onChangeText={setTitle}
+            maxLength={100}
+          />
           <TouchableOpacity
             style={[styles.startBtn, isLoading && styles.btnDisabled]}
             onPress={handleStartStream}
@@ -130,46 +161,39 @@ export default function StreamBroadcastScreen() {
           >
             {isLoading
               ? <ActivityIndicator color={palette.white} />
-              : <Text style={styles.startBtnText}>🔴 Yayını Başlat</Text>
-            }
+              : <Text style={styles.startBtnText}>🔴 Yayını Başlat</Text>}
           </TouchableOpacity>
         </View>
       </View>
     );
   }
 
-  // ─── Live Phase ────────────────────────────────────────────────────────────
-  if (phase === 'live') {
+  // ─── Live ────────────────────────────────────────────────────────────────────
+  if (phase === 'live' && lkToken) {
     return (
       <View style={styles.container}>
-        <View style={styles.liveCameraArea}>
-          <View style={styles.cameraPreview}>
-            <Text style={styles.cameraIcon}>📹</Text>
-          </View>
-
-          {/* Overlay */}
-          <View style={styles.liveTopBar}>
-            <View style={styles.liveBadge}>
-              <View style={styles.liveDot} />
-              <Text style={styles.liveText}>CANLI • {formatDuration(duration)}</Text>
-            </View>
-            <View style={styles.viewerBadge}>
-              <Text style={styles.viewerText}>👁 {viewerCount}</Text>
-            </View>
-          </View>
-
-          <TouchableOpacity style={styles.endBtn} onPress={handleEndStream}>
-            <Text style={styles.endBtnText}>■ Yayını Bitir</Text>
-          </TouchableOpacity>
-        </View>
+        <LiveKitRoom
+          serverUrl={LIVEKIT_URL}
+          token={lkToken}
+          connect={true}
+          options={{ adaptiveStream: { pixelDensity: 'screen' } }}
+          audio={true}
+          video={true}
+        >
+          <BroadcastView
+            onEnd={handleEndStream}
+            duration={duration}
+            viewerCount={viewerCount}
+          />
+        </LiveKitRoom>
       </View>
     );
   }
 
-  // ─── Ended Phase ──────────────────────────────────────────────────────────
+  // ─── Ended ───────────────────────────────────────────────────────────────────
   return (
     <View style={[styles.container, styles.center]}>
-      <Text style={styles.endedEmoji}>🎉</Text>
+      <Text style={{ fontSize: 64 }}>🎉</Text>
       <Text style={styles.endedTitle}>Yayın Bitti!</Text>
       <Text style={styles.endedSub}>Süre: {formatDuration(duration)}</Text>
       <TouchableOpacity style={styles.startBtn} onPress={() => navigation.goBack()}>
@@ -189,30 +213,21 @@ const styles = StyleSheet.create({
   cameraPreview: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.dark3, margin: spacing.xl, borderRadius: radius.xl, gap: spacing.md },
   cameraIcon: { fontSize: 56 },
   cameraText: { color: palette.grey2, fontSize: typography.sm, textAlign: 'center' },
-  setupForm: { padding: spacing.xl, gap: spacing.lg },
-  fieldGroup: { gap: spacing.sm },
+  form: { padding: spacing.xl, gap: spacing.md },
   label: { color: palette.grey3, fontSize: typography.sm, fontWeight: '600' },
   input: { backgroundColor: palette.dark3, borderRadius: radius.md, borderWidth: 1, borderColor: palette.dark4, paddingHorizontal: spacing.base, height: 52, color: palette.white, fontSize: typography.base },
-  categories: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  catChip: { paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderRadius: radius.full, backgroundColor: palette.dark3, borderWidth: 1, borderColor: palette.dark4 },
-  catChipActive: { backgroundColor: palette.primary, borderColor: palette.primary },
-  catText: { color: palette.grey2, fontSize: typography.sm, fontWeight: '600' },
-  catTextActive: { color: palette.white },
-  startBtn: { height: 54, backgroundColor: palette.primary, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', shadowColor: palette.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 12, elevation: 8 },
+  startBtn: { height: 54, backgroundColor: palette.primary, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
   btnDisabled: { opacity: 0.6 },
   startBtnText: { color: palette.white, fontSize: typography.md, fontWeight: '700' },
-  // Live
-  liveCameraArea: { flex: 1, position: 'relative' },
+  liveCameraArea: { flex: 1, position: 'relative', backgroundColor: '#000' },
   liveTopBar: { position: 'absolute', top: 44, left: spacing.base, right: spacing.base, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  liveBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: palette.liveBadge, paddingHorizontal: spacing.sm, paddingVertical: 5, borderRadius: radius.full },
+  liveBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#FF3F3F', paddingHorizontal: spacing.sm, paddingVertical: 5, borderRadius: radius.full },
   liveDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: palette.white },
   liveText: { color: palette.white, fontSize: typography.xs, fontWeight: '800' },
   viewerBadge: { backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: spacing.sm, paddingVertical: 5, borderRadius: radius.full },
   viewerText: { color: palette.white, fontSize: typography.xs, fontWeight: '600' },
   endBtn: { position: 'absolute', bottom: 50, alignSelf: 'center', backgroundColor: palette.error, paddingHorizontal: spacing.xl, paddingVertical: spacing.md, borderRadius: radius.full },
   endBtnText: { color: palette.white, fontWeight: '700', fontSize: typography.base },
-  // Ended
-  endedEmoji: { fontSize: 64 },
   endedTitle: { fontSize: typography.xl, fontWeight: '800', color: palette.white },
   endedSub: { color: palette.grey2, fontSize: typography.base },
 });

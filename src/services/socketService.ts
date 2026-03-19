@@ -1,7 +1,8 @@
 import { io, Socket } from 'socket.io-client';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { WS_BASE_URL, STORAGE_KEYS } from '@constants/index';
-import type { Comment, Gift } from '@appTypes/index';
+import type { Comment, GiftGift } from '@appTypes/index';//classlar gelcek
+
 
 type SocketEvent =
   | 'new_comment'

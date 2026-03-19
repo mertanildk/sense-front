@@ -1,10 +1,34 @@
 PODS:
-  - BVLinearGradient (2.8.3):
-    - React-Core
   - FBLazyVector (0.84.0)
   - hermes-engine (250829098.0.7):
     - hermes-engine/Pre-built (= 250829098.0.7)
   - hermes-engine/Pre-built (250829098.0.7)
+  - livekit-react-native (2.9.6):
+    - hermes-engine
+    - livekit-react-native-webrtc
+    - RCTRequired
+    - RCTTypeSafety
+    - React-Core
+    - React-Core-prebuilt
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-ImageManager
+    - React-jsi
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-renderercss
+    - React-rendererdebug
+    - React-utils
+    - ReactCodegen
+    - ReactCommon/turbomodule/bridging
+    - ReactCommon/turbomodule/core
+    - ReactNativeDependencies
+    - Yoga
+  - livekit-react-native-webrtc (137.0.2):
+    - React-Core
+    - WebRTC-SDK (= 137.7151.04)
   - RCTDeprecation (0.84.0)
   - RCTRequired (0.84.0)
   - RCTSwiftUI (0.84.0)
@@ -47,7 +71,7 @@ PODS:
     - React-utils
     - ReactNativeDependencies
     - Yoga
-  - React-Core-prebuilt (0.84.1):
+  - React-Core-prebuilt (0.84.0):
     - ReactNativeDependencies
   - React-Core/CoreModulesHeaders (0.84.0):
     - hermes-engine
@@ -1947,12 +1971,14 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
+  - WebRTC-SDK (137.7151.04)
   - Yoga (0.0.0)
 
 DEPENDENCIES:
-  - BVLinearGradient (from `../node_modules/react-native-linear-gradient`)
   - FBLazyVector (from `../node_modules/react-native/Libraries/FBLazyVector`)
   - hermes-engine (from `../node_modules/react-native/sdks/hermes-engine/hermes-engine.podspec`)
+  - "livekit-react-native (from `../node_modules/@livekit/react-native`)"
+  - "livekit-react-native-webrtc (from `../node_modules/@livekit/react-native-webrtc`)"
   - RCTDeprecation (from `../node_modules/react-native/ReactApple/Libraries/RCTFoundation/RCTDeprecation`)
   - RCTRequired (from `../node_modules/react-native/Libraries/Required`)
   - RCTSwiftUI (from `../node_modules/react-native/ReactApple/RCTSwiftUI`)
@@ -2030,14 +2056,20 @@ DEPENDENCIES:
   - RNScreens (from `../node_modules/react-native-screens`)
   - Yoga (from `../node_modules/react-native/ReactCommon/yoga`)
 
+SPEC REPOS:
+  trunk:
+    - WebRTC-SDK
+
 EXTERNAL SOURCES:
-  BVLinearGradient:
-    :path: "../node_modules/react-native-linear-gradient"
   FBLazyVector:
     :path: "../node_modules/react-native/Libraries/FBLazyVector"
   hermes-engine:
     :podspec: "../node_modules/react-native/sdks/hermes-engine/hermes-engine.podspec"
     :tag: hermes-v250829098.0.8
+  livekit-react-native:
+    :path: "../node_modules/@livekit/react-native"
+  livekit-react-native-webrtc:
+    :path: "../node_modules/@livekit/react-native-webrtc"
   RCTDeprecation:
     :path: "../node_modules/react-native/ReactApple/Libraries/RCTFoundation/RCTDeprecation"
   RCTRequired:
@@ -2190,9 +2222,10 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native/ReactCommon/yoga"
 
 SPEC CHECKSUMS:
-  BVLinearGradient: 880f91a7854faff2df62518f0281afb1c60d49a3
   FBLazyVector: c12d2108050e27952983d565a232f6f7b1ad5e69
   hermes-engine: 003bb22eb8c8d73dc16bd0ac868c146123656bb3
+  livekit-react-native: e15bf567bdc139127fc334e24b254267d202edd0
+  livekit-react-native-webrtc: 3bb1be767c4e489f69bca662eba1c5e7b1e1be0d
   RCTDeprecation: 3280799c14232a56e5a44f92981a8ee33bc69fd9
   RCTRequired: 9854a51b0f65ccf43ea0b744df4d70fce339db32
   RCTSwiftUI: 96986e49a4fdc2c2103929dee2641e1b57edf33d
@@ -2201,7 +2234,7 @@ SPEC CHECKSUMS:
   React: 7ef36630d07638043a134a7dd2ec17e0be10fc3c
   React-callinvoker: af4e8fe1d60ab63dd8d74c2a68988064c2848954
   React-Core: c0fb1df65eb0ed7a8633841831f05f93c3eb3aff
-  React-Core-prebuilt: d33f133de4c694b72bcce73d6998937c141e1ab7
+  React-Core-prebuilt: c129750bd024df34c3bb5112f01e7e6dc31dfa3b
   React-CoreModules: 7dfe7962360355f1547c85ab52e1fc4b57f17127
   React-cxxreact: 9e9c7f1710bc58abebf924813b5e825b99adb8e5
   React-debug: 38389b86e3570558ec73dd4cbc0cd2f2eec47a51
@@ -2267,6 +2300,7 @@ SPEC CHECKSUMS:
   RNCAsyncStorage: e85a99325df9eb0191a6ee2b2a842644c7eb29f4
   RNGestureHandler: 6d378fd1aa991c7ab62a4215ee6cc417895a6954
   RNScreens: 088d923c4327c63c9f8c942cae17a9d038f47d97
+  WebRTC-SDK: 40d4f5ba05cadff14e4db5614aec402a633f007e
   Yoga: 772166513f9cd2d61a6251d0dacbbfaa5b537479
 
 PODFILE CHECKSUM: 026af45dffb5fc71d0011491e98d794f76f3821a
